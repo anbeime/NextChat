@@ -1,91 +1,23 @@
-name: Sync from Upstream
+name: Upstream Sync
+permissions:
+  contents: write
 on:
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Dry run mode (no actual changes)'
-        required: false
-        default: 'false'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
 jobs:
-  sync:
+  sync_latest_from_upstream:
+    name: Sync latest commits from upstream repo
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - name: Checkout repository
+      - name: Checkout target repo
         uses: actions/checkout@v4
+      - name: Sync upstream changes
+        id: sync
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
         with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Add upstream remote
-        run: |
-          git remote add upstream https://github.com/ChatGPTNextWeb/NextChat.git
-      - name: Fetch upstream
-        run: |
-          git fetch upstream
-      - name: Check upstream updates
-        id: check_upstream
-        run: |
-          echo "Fetching commits from upstream..."
-          git fetch upstream main
-          
-          local_hash=$(git rev-parse HEAD)
-          upstream_hash=$(git rev-parse upstream/main)
-          
-          echo "Local commit: $local_hash"
-          echo "Upstream commit: $upstream_hash"
-          
-          if [ "$local_hash" != "$upstream_hash" ]; then
-            echo "has_updates=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_updates=false" >> $GITHUB_OUTPUT
-          fi
-      - name: Merge upstream changes
-        if: steps.check_upstream.outputs.has_updates == 'true' && github.event.inputs.dry_run != 'true'
-        run: |
-          git config user.name "GitHub Actions Bot"
-          git config user.email "actions@github.com"
-          git merge upstream/main --no-edit
-      - name: Check for conflicts
-        id: check_conflicts
-        run: |
-          if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
-            echo "has_conflicts=true" >> $GITHUB_OUTPUT
-            echo "conflicted_files=$(git diff --name-only --diff-filter=U)" >> $GITHUB_OUTPUT
-          else
-            echo "has_conflicts=false" >> $GITHUB_OUTPUT
-          fi
-      - name: Resolve conflicts (accept upstream)
-        if: steps.check_conflicts.outputs.has_conflicts == 'true' && github.event.inputs.dry_run != 'true'
-        run: |
-          git checkout --ours .
-          git add .
-          git commit -m "Merge upstream/main with conflict resolution (accept upstream)"
-      - name: Check for changes to push
-        id: check_changes
-        run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
-      - name: Push changes
-        if: steps.check_changes.outputs.has_changes == 'true' && github.event.inputs.dry_run != 'true'
-        run: |
-          git push
-      - name: Summary
-        run: |
-echo "## 📊 Sync Summary" >> $GITHUB_STEP_SUMMARY
-echo "" >> $GITHUB_STEP_SUMMARY
-echo "**Upstream:** ChatGPTNextWeb/NextChat" >> $GITHUB_STEP_SUMMARY
-echo "" >> $GITHUB_STEP_SUMMARY
-echo "has_updates: ${{ steps.check_upstream.outputs.has_updates }}" >> $GITHUB_STEP_SUMMARY
-echo "has_conflicts: ${{ steps.check_conflicts.outputs.has_conflicts }}" >> $GITHUB_STEP_SUMMARY
-echo "has_changes: ${{ steps.check_changes.outputs.has_changes }}" >> $GITHUB_STEP_SUMMARY
-echo "dry_run: ${{ github.event.inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+          upstream_sync_repo: ChatGPTNextWeb/NextChat
+          upstream_sync_branch: main
+          target_sync_branch: main
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+          test_mode: false
