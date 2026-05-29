@@ -81,22 +81,11 @@ jobs:
           git push
       - name: Summary
         run: |
-          echo "## 📊 Sync Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Upstream:** ChatGPTNextWeb/NextChat" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.check_upstream.outputs.has_updates }}" == "true" ]; then
-            echo "✅ Upstream has updates" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "ℹ️ Already up-to-date with upstream" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.check_conflicts.outputs.has_conflicts }}" == "true" ]; then
-            echo "⚠️ Conflicts resolved (accepted upstream):" >> $GITHUB_STEP_SUMMARY
-            echo "  `${{ steps.check_conflicts.outputs.conflicted_files }}\`" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.check_changes.outputs.has_changes }}" == "true" ] && [ "${{ github.event.inputs.dry_run }}" != "true" ]; then
-            echo "✅ Changes pushed" >> $GITHUB_STEP_SUMMARY
-          elif [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
-            echo "🔍 Dry run - no changes pushed" >> $GITHUB_STEP_SUMMARY
+echo "## 📊 Sync Summary" >> $GITHUB_STEP_SUMMARY
+echo "" >> $GITHUB_STEP_SUMMARY
+echo "**Upstream:** ChatGPTNextWeb/NextChat" >> $GITHUB_STEP_SUMMARY
+echo "" >> $GITHUB_STEP_SUMMARY
+echo "has_updates: ${{ steps.check_upstream.outputs.has_updates }}" >> $GITHUB_STEP_SUMMARY
+echo "has_conflicts: ${{ steps.check_conflicts.outputs.has_conflicts }}" >> $GITHUB_STEP_SUMMARY
+echo "has_changes: ${{ steps.check_changes.outputs.has_changes }}" >> $GITHUB_STEP_SUMMARY
+echo "dry_run: ${{ github.event.inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
