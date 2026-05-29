@@ -1,40 +1,106 @@
-name: Upstream Sync
-
-permissions:
-  contents: write
-
+name: Sync from Upstream
 on:
   schedule:
-    - cron: "0 0 * * *" # every day
+    - cron: '0 2 * * *'
   workflow_dispatch:
-
+    inputs:
+      dry_run:
+        description: 'Dry run mode (no actual changes)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 jobs:
-  sync_latest_from_upstream:
-    name: Sync latest commits from upstream repo
+  sync:
     runs-on: ubuntu-latest
-    if: ${{ github.event.repository.fork }}
-
+    permissions:
+      contents: write
     steps:
-      # Step 1: run a standard checkout action
-      - name: Checkout target repo
-        uses: actions/checkout@v3
-
-      # Step 2: run the sync action
-      - name: Sync upstream changes
-        id: sync
-        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          upstream_sync_repo: ChatGPTNextWeb/ChatGPT-Next-Web
-          upstream_sync_branch: main
-          target_sync_branch: main
-          target_repo_token: ${{ secrets.GITHUB_TOKEN }} # automatically generated, no need to set
-
-          # Set test_mode true to run tests instead of the true action!!
-          test_mode: false
-
-      - name: Sync check
-        if: failure()
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Add upstream remote
         run: |
-          echo "[Error] 由于上游仓库的 workflow 文件变更，导致 GitHub 自动暂停了本次自动更新，你需要手动 Sync Fork 一次，详细教程请查看：https://github.com/Yidadaa/ChatGPT-Next-Web/blob/main/README_CN.md#%E6%89%93%E5%BC%80%E8%87%AA%E5%8A%A8%E6%9B%B4%E6%96%B0"
-          echo "[Error] Due to a change in the workflow file of the upstream repository, GitHub has automatically suspended the scheduled automatic update. You need to manually sync your fork. Please refer to the detailed tutorial for instructions: https://github.com/Yidadaa/ChatGPT-Next-Web#enable-automatic-updates"
-          exit 1
+          git remote add upstream https://github.com/ChatGPTNextWeb/NextChat.git
+      - name: Fetch upstream
+        run: |
+          git fetch upstream
+      - name: Check upstream updates
+        id: check_upstream
+        run: |
+          upstream_main="upstream/dev"
+          current_branch=$(git rev-parse --abbrev-ref HEAD)
+          
+          echo "Fetching commits from upstream ($upstream_main)..."
+          git fetch upstream dev
+          
+          local_hash=$(git rev-parse HEAD)
+          upstream_hash=$(git rev-parse upstream/dev)
+          
+          echo "Local commit: $local_hash"
+          echo "Upstream commit: $upstream_hash"
+          
+          if [ "$local_hash" != "$upstream_hash" ]; then
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Merge upstream changes
+        if: steps.check_upstream.outputs.has_updates == 'true' && github.event.inputs.dry_run != 'true'
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git merge upstream/dev --no-edit
+      - name: Check for conflicts
+        id: check_conflicts
+        run: |
+          if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+            echo "has_conflicts=true" >> $GITHUB_OUTPUT
+            echo "conflicted_files=$(git diff --name-only --diff-filter=U)" >> $GITHUB_OUTPUT
+          else
+            echo "has_conflicts=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Resolve conflicts (accept upstream)
+        if: steps.check_conflicts.outputs.has_conflicts == 'true' && github.event.inputs.dry_run != 'true'
+        run: |
+          git checkout --ours .
+          git add .
+          git commit -m "Merge upstream/dev with conflict resolution (accept upstream)"
+      - name: Check for changes to push
+        id: check_changes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Push changes
+        if: steps.check_changes.outputs.has_changes == 'true' && github.event.inputs.dry_run != 'true'
+        run: |
+          git push
+      - name: Summary
+        run: |
+          echo "## 📊 Sync Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Upstream:** ChatGPTNextWeb/NextChat" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check_upstream.outputs.has_updates }}" == "true" ]; then
+            echo "✅ Upstream has updates" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ Already up-to-date with upstream" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check_conflicts.outputs.has_conflicts }}" == "true" ]; then
+            echo "⚠️ Conflicts resolved (accepted upstream):" >> $GITHUB_STEP_SUMMARY
+            echo "  \`${{ steps.check_conflicts.outputs.conflicted_files }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check_changes.outputs.has_changes }}" == "true" ] && [ "${{ github.event.inputs.dry_run }}" != "true" ]; then
+            echo "✅ Changes pushed to \`$(git rev-parse --abbrev-ref HEAD)\`" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+            echo "🔍 Dry run - no changes pushed" >> $GITHUB_STEP_SUMMARY
+          fi
