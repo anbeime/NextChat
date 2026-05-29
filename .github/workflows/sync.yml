@@ -32,14 +32,11 @@ jobs:
       - name: Check upstream updates
         id: check_upstream
         run: |
-          upstream_main="upstream/dev"
-          current_branch=$(git rev-parse --abbrev-ref HEAD)
-          
-          echo "Fetching commits from upstream ($upstream_main)..."
-          git fetch upstream dev
+          echo "Fetching commits from upstream..."
+          git fetch upstream main
           
           local_hash=$(git rev-parse HEAD)
-          upstream_hash=$(git rev-parse upstream/dev)
+          upstream_hash=$(git rev-parse upstream/main)
           
           echo "Local commit: $local_hash"
           echo "Upstream commit: $upstream_hash"
@@ -54,7 +51,7 @@ jobs:
         run: |
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
-          git merge upstream/dev --no-edit
+          git merge upstream/main --no-edit
       - name: Check for conflicts
         id: check_conflicts
         run: |
@@ -69,7 +66,7 @@ jobs:
         run: |
           git checkout --ours .
           git add .
-          git commit -m "Merge upstream/dev with conflict resolution (accept upstream)"
+          git commit -m "Merge upstream/main with conflict resolution (accept upstream)"
       - name: Check for changes to push
         id: check_changes
         run: |
@@ -103,4 +100,3 @@ jobs:
             echo "✅ Changes pushed to \`$(git rev-parse --abbrev-ref HEAD)\`" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
             echo "🔍 Dry run - no changes pushed" >> $GITHUB_STEP_SUMMARY
-          fi
