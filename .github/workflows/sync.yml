@@ -93,10 +93,10 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ "${{ steps.check_conflicts.outputs.has_conflicts }}" == "true" ]; then
             echo "⚠️ Conflicts resolved (accepted upstream):" >> $GITHUB_STEP_SUMMARY
-            echo "  \`${{ steps.check_conflicts.outputs.conflicted_files }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "  `${{ steps.check_conflicts.outputs.conflicted_files }}\`" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ "${{ steps.check_changes.outputs.has_changes }}" == "true" ] && [ "${{ github.event.inputs.dry_run }}" != "true" ]; then
-            echo "✅ Changes pushed to \`$(git rev-parse --abbrev-ref HEAD)\`" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Changes pushed" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
             echo "🔍 Dry run - no changes pushed" >> $GITHUB_STEP_SUMMARY
